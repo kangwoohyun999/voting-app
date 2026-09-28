@@ -8,8 +8,15 @@ export function createSmtpMailer(env = process.env): Mailer {
   const missing = REQUIRED.filter((key) => !env[key]);
   if (missing.length > 0) {
     const problem = `SMTP is not configured: set ${missing.join(", ")} in .env.local`;
-    // Fail loudly in production; in development print emails so the app stays usable.
-    if (env.NODE_ENV === "production") throw new Error(problem);
+    // Fail on send in production (not at import, which would break the build);
+    // in development print emails so the app stays usable.
+    if (env.NODE_ENV === "production") {
+      return {
+        send: async () => {
+          throw new Error(problem);
+        },
+      };
+    }
     console.warn(`${problem}. Emails will be printed to the console instead.`);
     return { send: async (email) => console.info("[email]", email) };
   }
