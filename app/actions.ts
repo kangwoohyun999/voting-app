@@ -29,6 +29,15 @@ export async function ownerAction(form: FormData) {
   refresh();
 }
 
+export async function recoverAction(_prev: boolean, form: FormData): Promise<boolean> {
+  await polls.recoverOwnerLinks({
+    email: String(form.get("email") ?? ""),
+    language: await getLanguage(),
+    origin: await appOrigin(),
+  });
+  return true; // Same answer whether or not the email has Polls.
+}
+
 export type CreateState =
   | { status: "idle" }
   | { status: "error"; error: "owner-email-required" }

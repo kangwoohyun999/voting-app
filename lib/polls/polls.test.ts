@@ -277,6 +277,54 @@ describe("deleting", () => {
   });
 });
 
+describe("recovering Owner Links", () => {
+  const recover = (email: string) => polls.recoverOwnerLinks({ email, language: "ko", origin: ORIGIN });
+
+  it("sends one email listing the original Owner Links of every Poll for that Owner Email", async () => {
+    const first = await createLunch();
+    const second = await createLunch();
+    await polls.createPoll({ ...lunch, ownerEmail: "someone-else@example.com" });
+    sent = [];
+
+    await recover("  OWNER@example.com ");
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].to).toBe("owner@example.com");
+    expect(sent[0].text).toContain(`${ORIGIN}/o/${first.ownerToken}`);
+    expect(sent[0].text).toContain(`${ORIGIN}/o/${second.ownerToken}`);
+    expect(sent[0].text.match(/\/o\//g)).toHaveLength(2);
+  });
+
+  it("leaves out Deleted Polls, and sends nothing if none remain", async () => {
+    const kept = await createLunch();
+    const gone = await createLunch();
+    await polls.deletePoll(gone.ownerToken);
+    sent = [];
+
+    await recover("owner@example.com");
+    expect(sent[0].text).toContain(kept.ownerToken);
+    expect(sent[0].text).not.toContain(gone.ownerToken);
+
+    await polls.deletePoll(kept.ownerToken);
+    sent = [];
+    await recover("owner@example.com");
+    expect(sent).toEqual([]);
+  });
+
+  it("sends nothing for an unknown email", async () => {
+    await createLunch();
+    sent = [];
+    await recover("stranger@example.com");
+    expect(sent).toEqual([]);
+  });
+
+  it("resends links that keep working", async () => {
+    const { ownerToken } = await createLunch();
+    await recover("owner@example.com");
+    expect((await polls.viewAsOwner(ownerToken, null)).kind).toBe("poll");
+  });
+});
+
 describe("viewing a Poll by its Poll Link", () => {
   it("shows the question, Options and Open status, but not the Owner Email", async () => {
     const created = await polls.createPoll(lunch);

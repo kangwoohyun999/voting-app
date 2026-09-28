@@ -37,6 +37,12 @@ export const messages = {
     deletePoll: "투표 삭제",
     confirmDelete: "이 투표를 삭제할까요? 되돌릴 수 없습니다.",
     deleted: "투표 만든 사람이 삭제한 투표입니다.",
+    recoverLink: "관리 링크를 잃어버리셨나요?",
+    recoverTitle: "관리 링크 찾기",
+    recoverIntro: "투표를 만들 때 입력한 이메일로 관리 링크를 다시 보내 드립니다.",
+    recoverEmail: "이메일",
+    recoverSubmit: "관리 링크 보내기",
+    recoverSent: "이 이메일로 만든 투표가 있다면 관리 링크를 보냈습니다. 메일함을 확인해 주세요.",
     backHome: "처음으로",
   },
 } as const;

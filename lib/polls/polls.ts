@@ -195,7 +195,42 @@ export function createPolls({ db, mailer }: { db: Db; mailer: Mailer }) {
   const reopenPoll = (ownerToken: string) => setStatus(ownerToken, "open");
   const deletePoll = (ownerToken: string) => setStatus(ownerToken, "deleted");
 
-  return { createPoll, viewPoll, viewAsOwner, castVote, closePoll, reopenPoll, deletePoll };
+  /**
+   * Resends the original Owner Links of every non-Deleted Poll for this Owner Email.
+   * Returns nothing, so callers can't reveal whether the email has any Polls.
+   */
+  async function recoverOwnerLinks(input: { email: string; language: Language; origin: string }) {
+    const ownerEmail = input.email.trim().toLowerCase();
+    const owned = await db.query<{ id: string; question: string; owner_token: string }>(
+      `SELECT id, question, owner_token FROM polls
+       WHERE owner_email = $1 AND status <> 'deleted'
+       ORDER BY created_at`,
+      [ownerEmail],
+    );
+    if (owned.length === 0) return;
+
+    await trySend({
+      to: ownerEmail,
+      ...emails[input.language].recovery(
+        owned.map((p) => ({
+          question: p.question,
+          pollLink: pollLink(input.origin, p.id),
+          ownerLink: ownerLink(input.origin, p.owner_token),
+        })),
+      ),
+    });
+  }
+
+  return {
+    createPoll,
+    viewPoll,
+    viewAsOwner,
+    castVote,
+    closePoll,
+    reopenPoll,
+    deletePoll,
+    recoverOwnerLinks,
+  };
 }
 
 function maskEmail(email: string) {
