@@ -1,6 +1,7 @@
-import Link from "next/link";
 import { appOrigin, getMessages, getVoterId, polls } from "@/lib/server";
 import { ownerAction } from "../../actions";
+import { DeleteButton } from "../../delete-button";
+import { Gone } from "../../gone";
 import { PollBody } from "../../poll-parts";
 
 export default async function OwnerPage({ params }: PageProps<"/o/[token]">) {
@@ -8,14 +9,8 @@ export default async function OwnerPage({ params }: PageProps<"/o/[token]">) {
   const t = await getMessages();
   const view = await polls.viewAsOwner(token, await getVoterId());
 
-  if (view.kind === "not-found") {
-    return (
-      <main className="page">
-        <p>{t.ownerLinkNotFound}</p>
-        <Link href="/" className="underline">{t.backHome}</Link>
-      </main>
-    );
-  }
+  if (view.kind === "not-found") return <Gone message={t.ownerLinkNotFound} backHome={t.backHome} />;
+  if (view.kind === "deleted") return <Gone message={t.deleted} backHome={t.backHome} />;
 
   const pollLink = `${await appOrigin()}/p/${view.id}`;
 
@@ -42,6 +37,7 @@ export default async function OwnerPage({ params }: PageProps<"/o/[token]">) {
         ) : (
           <button name="intent" value="reopen" className="btn-secondary">{t.reopenPoll}</button>
         )}
+        <DeleteButton label={t.deletePoll} confirmText={t.confirmDelete} />
       </form>
     </main>
   );

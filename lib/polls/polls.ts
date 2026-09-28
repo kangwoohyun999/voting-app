@@ -9,7 +9,7 @@ export type Option = { id: number; label: string };
 
 export type Result = { optionId: number; label: string; count: number; percent: number };
 
-type LoadedPoll = {
+export type LoadedPoll = {
   kind: "poll";
   id: string;
   question: string;
@@ -21,9 +21,11 @@ type LoadedPoll = {
   results: Result[] | null;
 };
 
-export type PollView = { kind: "not-found" } | LoadedPoll;
+type Gone = { kind: "not-found" } | { kind: "deleted" };
 
-export type OwnerView = { kind: "not-found" } | (LoadedPoll & { ownerEmailHint: string });
+export type PollView = Gone | LoadedPoll;
+
+export type OwnerView = Gone | (LoadedPoll & { ownerEmailHint: string });
 
 type CreatePollInput = {
   question: string;
@@ -36,11 +38,19 @@ type CreatePollResult =
   | { ok: true; pollId: string; ownerToken: string }
   | { ok: false; error: "owner-email-required" };
 
-type VoteResult = { ok: true } | { ok: false; error: "not-found" | "closed" | "invalid-option" };
+type VoteResult =
+  | { ok: true }
+  | { ok: false; error: "not-found" | "deleted" | "closed" | "invalid-option" };
 
-type OwnerActionResult = { ok: true } | { ok: false; error: "not-found" };
+type OwnerActionResult = { ok: true } | { ok: false; error: "not-found" | "deleted" };
 
-type PollRow = { id: string; question: string; status: "open" | "closed"; owner_email: string };
+type PollRow = {
+  id: string;
+  question: string;
+  status: "open" | "closed" | "deleted";
+  owner_email: string;
+};
+type LivePollRow = PollRow & { status: "open" | "closed" };
 type TallyRow = { id: number; label: string; count: number };
 
 const randomId = (bytes: number) => randomBytes(bytes).toString("base64url");
@@ -66,7 +76,7 @@ export function createPolls({ db }: { db: Db }) {
     return { ok: true, pollId, ownerToken };
   }
 
-  async function load(poll: PollRow, voterId: string | null, isOwner: boolean): Promise<LoadedPoll> {
+  async function load(poll: LivePollRow, voterId: string | null, isOwner: boolean): Promise<LoadedPoll> {
     const tally = await db.query<TallyRow>(
       `SELECT o.id, o.label, count(v.voter_id)::int AS count
        FROM options o LEFT JOIN votes v ON v.option_id = o.id
@@ -106,14 +116,19 @@ export function createPolls({ db }: { db: Db }) {
   async function viewPoll(pollId: string, voterId: string | null): Promise<PollView> {
     const poll = await findPoll("id", pollId);
     if (!poll) return { kind: "not-found" };
-    return load(poll, voterId, false);
+    if (poll.status === "deleted") return { kind: "deleted" };
+    return load(poll as LivePollRow, voterId, false);
   }
 
   /** The Poll as seen through its Owner Link; `voterId` is the owner's own browser. */
   async function viewAsOwner(ownerToken: string, voterId: string | null): Promise<OwnerView> {
     const poll = await findPoll("owner_token", ownerToken);
     if (!poll) return { kind: "not-found" };
-    return { ...(await load(poll, voterId, true)), ownerEmailHint: maskEmail(poll.owner_email) };
+    if (poll.status === "deleted") return { kind: "deleted" };
+    return {
+      ...(await load(poll as LivePollRow, voterId, true)),
+      ownerEmailHint: maskEmail(poll.owner_email),
+    };
   }
 
   async function castVote(pollId: string, voterId: string, optionId: number): Promise<VoteResult> {
@@ -132,21 +147,26 @@ export function createPolls({ db }: { db: Db }) {
 
     const poll = await findPoll("id", pollId);
     if (!poll) return { ok: false, error: "not-found" };
-    return { ok: false, error: poll.status === "open" ? "invalid-option" : "closed" };
+    if (poll.status === "open") return { ok: false, error: "invalid-option" };
+    return { ok: false, error: poll.status };
   }
 
-  async function setStatus(ownerToken: string, status: "open" | "closed"): Promise<OwnerActionResult> {
+  async function setStatus(ownerToken: string, status: PollRow["status"]): Promise<OwnerActionResult> {
+    // A Deleted Poll is final.
     const updated = await db.query(
-      `UPDATE polls SET status = $2 WHERE owner_token = $1 RETURNING id`,
+      `UPDATE polls SET status = $2 WHERE owner_token = $1 AND status <> 'deleted' RETURNING id`,
       [ownerToken, status],
     );
-    return updated.length > 0 ? { ok: true } : { ok: false, error: "not-found" };
+    if (updated.length > 0) return { ok: true };
+    const poll = await findPoll("owner_token", ownerToken);
+    return { ok: false, error: poll ? "deleted" : "not-found" };
   }
 
   const closePoll = (ownerToken: string) => setStatus(ownerToken, "closed");
   const reopenPoll = (ownerToken: string) => setStatus(ownerToken, "open");
+  const deletePoll = (ownerToken: string) => setStatus(ownerToken, "deleted");
 
-  return { createPoll, viewPoll, viewAsOwner, castVote, closePoll, reopenPoll };
+  return { createPoll, viewPoll, viewAsOwner, castVote, closePoll, reopenPoll, deletePoll };
 }
 
 function maskEmail(email: string) {

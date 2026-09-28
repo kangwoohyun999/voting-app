@@ -213,6 +213,38 @@ describe("closing and reopening", () => {
   });
 });
 
+describe("deleting", () => {
+  it("makes the Poll Link say the Poll was deleted, distinct from not found", async () => {
+    const { pollId, ownerToken } = await createLunch();
+    expect(await polls.deletePoll(ownerToken)).toEqual({ ok: true });
+    expect(await polls.viewPoll(pollId, null)).toEqual({ kind: "deleted" });
+    expect(await polls.viewAsOwner(ownerToken, null)).toEqual({ kind: "deleted" });
+  });
+
+  it("rejects Votes and shows no Results, even to earlier Voters", async () => {
+    const { pollId, ownerToken, optionId } = await createLunch();
+    await polls.castVote(pollId, "alice", optionId("Pizza"));
+    await polls.deletePoll(ownerToken);
+
+    expect(await polls.castVote(pollId, "alice", optionId("Tacos"))).toEqual({ ok: false, error: "deleted" });
+    expect(await polls.viewPoll(pollId, "alice")).toEqual({ kind: "deleted" });
+  });
+
+  it("cannot be closed or reopened afterwards", async () => {
+    const { ownerToken } = await createLunch();
+    await polls.deletePoll(ownerToken);
+    expect(await polls.closePoll(ownerToken)).toEqual({ ok: false, error: "deleted" });
+    expect(await polls.reopenPoll(ownerToken)).toEqual({ ok: false, error: "deleted" });
+    expect(await polls.viewAsOwner(ownerToken, null)).toEqual({ kind: "deleted" });
+  });
+
+  it("is refused with a wrong Owner Link token", async () => {
+    const { pollId } = await createLunch();
+    expect(await polls.deletePoll("wrong-token")).toEqual({ ok: false, error: "not-found" });
+    expect((await pollFor(pollId, null)).status).toBe("open");
+  });
+});
+
 describe("viewing a Poll by its Poll Link", () => {
   it("shows the question, Options and Open status, but not the Owner Email", async () => {
     const created = await polls.createPoll(lunch);

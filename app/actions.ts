@@ -21,6 +21,9 @@ export async function ownerAction(form: FormData) {
     case "reopen":
       await polls.reopenPoll(token);
       break;
+    case "delete":
+      await polls.deletePoll(token);
+      break;
   }
   refresh();
 }

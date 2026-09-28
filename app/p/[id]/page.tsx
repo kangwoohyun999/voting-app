@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { getMessages, getVoterId, polls } from "@/lib/server";
+import { Gone } from "../../gone";
 import { PollBody } from "../../poll-parts";
 
 export default async function PollPage({ params }: PageProps<"/p/[id]">) {
@@ -7,14 +7,8 @@ export default async function PollPage({ params }: PageProps<"/p/[id]">) {
   const t = await getMessages();
   const view = await polls.viewPoll(id, await getVoterId());
 
-  if (view.kind === "not-found") {
-    return (
-      <main className="page">
-        <p>{t.notFound}</p>
-        <Link href="/" className="underline">{t.backHome}</Link>
-      </main>
-    );
-  }
+  if (view.kind === "not-found") return <Gone message={t.notFound} backHome={t.backHome} />;
+  if (view.kind === "deleted") return <Gone message={t.deleted} backHome={t.backHome} />;
 
   return (
     <main className="page">

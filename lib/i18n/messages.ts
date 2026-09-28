@@ -32,6 +32,9 @@ export const messages = {
     closedNotice: "마감된 투표입니다. 더 이상 투표하거나 선택을 바꿀 수 없습니다.",
     closePoll: "투표 마감",
     reopenPoll: "투표 다시 열기",
+    deletePoll: "투표 삭제",
+    confirmDelete: "이 투표를 삭제할까요? 되돌릴 수 없습니다.",
+    deleted: "투표 만든 사람이 삭제한 투표입니다.",
     backHome: "처음으로",
   },
 } as const;
