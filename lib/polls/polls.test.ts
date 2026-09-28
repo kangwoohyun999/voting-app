@@ -133,6 +133,43 @@ describe("voting", () => {
   });
 });
 
+async function ownerView(ownerToken: string, voterId: string | null = null) {
+  const view = await polls.viewAsOwner(ownerToken, voterId);
+  if (view.kind !== "poll") throw new Error(`expected poll, got ${view.kind}`);
+  return view;
+}
+
+describe("the Owner Link", () => {
+  it("always shows Results, even before the Poll Owner votes", async () => {
+    const { pollId, ownerToken, optionId } = await createLunch();
+    expect((await ownerView(ownerToken)).results?.map((r) => r.count)).toEqual([0, 0]);
+
+    await polls.castVote(pollId, "alice", optionId("Tacos"));
+    expect((await ownerView(ownerToken)).results?.map((r) => r.count)).toEqual([0, 1]);
+  });
+
+  it("shows only a masked hint of the Owner Email", async () => {
+    const { ownerToken } = await createLunch();
+    const view = await ownerView(ownerToken);
+    expect(view.ownerEmailHint).toBe("o•••@example.com");
+    expect(JSON.stringify(view)).not.toContain("owner@example.com");
+  });
+
+  it("lets the Poll Owner vote like any Voter", async () => {
+    const { pollId, ownerToken, optionId } = await createLunch();
+    await polls.castVote(pollId, "owner-browser", optionId("Pizza"));
+
+    const view = await ownerView(ownerToken, "owner-browser");
+    expect(view.myVote).toBe(optionId("Pizza"));
+    expect(view.results?.map((r) => r.count)).toEqual([1, 0]);
+  });
+
+  it("is not found for an invalid token", async () => {
+    await createLunch();
+    expect(await polls.viewAsOwner("wrong-token", null)).toEqual({ kind: "not-found" });
+  });
+});
+
 describe("viewing a Poll by its Poll Link", () => {
   it("shows the question, Options and Open status, but not the Owner Email", async () => {
     const created = await polls.createPoll(lunch);

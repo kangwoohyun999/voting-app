@@ -24,6 +24,9 @@ export const messages = {
     votes: "표",
     resultsAfterVoting: "투표하면 결과를 볼 수 있습니다.",
     noOptions: "이 투표에는 선택지가 없어 투표할 수 없습니다.",
+    ownerPageTitle: "투표 관리",
+    ownerEmailHint: "복구 이메일",
+    ownerLinkNotFound: "관리 링크가 올바르지 않습니다.",
     backHome: "처음으로",
   },
 } as const;

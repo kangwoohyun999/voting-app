@@ -9,19 +9,21 @@ export type Option = { id: number; label: string };
 
 export type Result = { optionId: number; label: string; count: number; percent: number };
 
-export type PollView =
-  | { kind: "not-found" }
-  | {
-      kind: "poll";
-      id: string;
-      question: string;
-      status: "open" | "closed";
-      options: Option[];
-      myVote: number | null;
-      canVote: boolean;
-      /** Null when the viewer may not see Results yet. */
-      results: Result[] | null;
-    };
+type LoadedPoll = {
+  kind: "poll";
+  id: string;
+  question: string;
+  status: "open" | "closed";
+  options: Option[];
+  myVote: number | null;
+  canVote: boolean;
+  /** Null when the viewer may not see Results yet. */
+  results: Result[] | null;
+};
+
+export type PollView = { kind: "not-found" } | LoadedPoll;
+
+export type OwnerView = { kind: "not-found" } | (LoadedPoll & { ownerEmailHint: string });
 
 type CreatePollInput = {
   question: string;
@@ -36,7 +38,7 @@ type CreatePollResult =
 
 type VoteResult = { ok: true } | { ok: false; error: "not-found" | "invalid-option" };
 
-type PollRow = { id: string; question: string; status: "open" | "closed" };
+type PollRow = { id: string; question: string; status: "open" | "closed"; owner_email: string };
 type TallyRow = { id: number; label: string; count: number };
 
 const randomId = (bytes: number) => randomBytes(bytes).toString("base64url");
@@ -62,36 +64,54 @@ export function createPolls({ db }: { db: Db }) {
     return { ok: true, pollId, ownerToken };
   }
 
-  async function viewPoll(pollId: string, voterId: string | null): Promise<PollView> {
-    const [poll] = await db.query<PollRow>(
-      `SELECT id, question, status FROM polls WHERE id = $1`,
-      [pollId],
-    );
-    if (!poll) return { kind: "not-found" };
-
+  async function load(poll: PollRow, voterId: string | null, isOwner: boolean): Promise<LoadedPoll> {
     const tally = await db.query<TallyRow>(
       `SELECT o.id, o.label, count(v.voter_id)::int AS count
        FROM options o LEFT JOIN votes v ON v.option_id = o.id
        WHERE o.poll_id = $1
        GROUP BY o.id ORDER BY o.position`,
-      [pollId],
+      [poll.id],
     );
     const [vote] = voterId
       ? await db.query<{ option_id: number }>(
           `SELECT option_id FROM votes WHERE poll_id = $1 AND voter_id = $2`,
-          [pollId, voterId],
+          [poll.id, voterId],
         )
       : [];
     const myVote = vote?.option_id ?? null;
+    const maySeeResults = isOwner || myVote !== null;
 
     return {
       kind: "poll",
-      ...poll,
+      id: poll.id,
+      question: poll.question,
+      status: poll.status,
       options: tally.map(({ id, label }) => ({ id, label })),
       myVote,
       canVote: tally.length > 0,
-      results: myVote !== null ? toResults(tally) : null,
+      results: maySeeResults ? toResults(tally) : null,
     };
+  }
+
+  async function findPoll(column: "id" | "owner_token", value: string) {
+    const [poll] = await db.query<PollRow>(
+      `SELECT id, question, status, owner_email FROM polls WHERE ${column} = $1`,
+      [value],
+    );
+    return poll;
+  }
+
+  async function viewPoll(pollId: string, voterId: string | null): Promise<PollView> {
+    const poll = await findPoll("id", pollId);
+    if (!poll) return { kind: "not-found" };
+    return load(poll, voterId, false);
+  }
+
+  /** The Poll as seen through its Owner Link; `voterId` is the owner's own browser. */
+  async function viewAsOwner(ownerToken: string, voterId: string | null): Promise<OwnerView> {
+    const poll = await findPoll("owner_token", ownerToken);
+    if (!poll) return { kind: "not-found" };
+    return { ...(await load(poll, voterId, true)), ownerEmailHint: maskEmail(poll.owner_email) };
   }
 
   async function castVote(pollId: string, voterId: string, optionId: number): Promise<VoteResult> {
@@ -109,7 +129,12 @@ export function createPolls({ db }: { db: Db }) {
     return { ok: false, error: poll ? "invalid-option" : "not-found" };
   }
 
-  return { createPoll, viewPoll, castVote };
+  return { createPoll, viewPoll, viewAsOwner, castVote };
+}
+
+function maskEmail(email: string) {
+  const at = email.lastIndexOf("@");
+  return at < 1 ? "•••" : `${email[0]}•••${email.slice(at)}`;
 }
 
 function toResults(tally: TallyRow[]): Result[] {
