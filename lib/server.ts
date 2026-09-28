@@ -3,7 +3,7 @@ import { neon } from "@neondatabase/serverless";
 import { randomUUID } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { createPolls, type Db } from "@/lib/polls/polls";
-import { messages, type Language } from "@/lib/i18n/messages";
+import { isLanguage, messages, type Language } from "@/lib/i18n/messages";
 import { createSmtpMailer } from "@/lib/mailer";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -32,8 +32,12 @@ export async function ensureVoterId(): Promise<string> {
   return voterId;
 }
 
+export const LANGUAGE_COOKIE = "lang";
+
+/** Korean unless the viewer has switched. */
 export async function getLanguage(): Promise<Language> {
-  return "ko";
+  const chosen = (await cookies()).get(LANGUAGE_COOKIE)?.value;
+  return isLanguage(chosen) ? chosen : "ko";
 }
 
 export async function getMessages() {

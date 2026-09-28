@@ -1,8 +1,9 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { cookies } from "next/headers";
 import { ownerLink, pollLink } from "@/lib/polls/polls";
-import { appOrigin, ensureVoterId, getLanguage, polls } from "@/lib/server";
+import { appOrigin, ensureVoterId, getLanguage, LANGUAGE_COOKIE, polls } from "@/lib/server";
 
 export async function castVoteAction(form: FormData) {
   const pollId = String(form.get("pollId"));
@@ -27,6 +28,11 @@ export async function ownerAction(form: FormData) {
       break;
   }
   refresh();
+}
+
+export async function switchLanguageAction() {
+  const next = (await getLanguage()) === "ko" ? "en" : "ko";
+  (await cookies()).set(LANGUAGE_COOKIE, next, { sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
 }
 
 export async function recoverAction(_prev: boolean, form: FormData): Promise<boolean> {

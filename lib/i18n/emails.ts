@@ -33,4 +33,27 @@ export const emails: Record<
       ].join("\n"),
     }),
   },
+  en: {
+    created: ({ question, pollLink, ownerLink }) => ({
+      subject: `Your poll is ready: ${question}`,
+      text: [
+        `Your poll "${question}" is ready.`,
+        "",
+        `Poll link (share it with voters): ${pollLink}`,
+        `Owner link (keep it secret): ${ownerLink}`,
+        "",
+        "Anyone with the owner link can close, reopen or delete this poll.",
+      ].join("\n"),
+    }),
+    recovery: (polls) => ({
+      subject: "Your poll owner links",
+      text: [
+        "Here are the owner links you asked for.",
+        "",
+        ...polls.flatMap((p) => [`• ${p.question}`, `  Owner link: ${p.ownerLink}`, `  Poll link: ${p.pollLink}`]),
+        "",
+        "If you didn't ask for this, you can ignore this email.",
+      ].join("\n"),
+    }),
+  },
 };

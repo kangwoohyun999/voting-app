@@ -325,6 +325,23 @@ describe("recovering Owner Links", () => {
   });
 });
 
+describe("email language", () => {
+  it("writes the creation email in the language the Poll was created in", async () => {
+    await polls.createPoll({ ...lunch, language: "en" });
+    expect(sent[0].subject).toBe("Your poll is ready: Friday lunch?");
+
+    await polls.createPoll({ ...lunch, language: "ko" });
+    expect(sent[1].subject).toBe("투표가 만들어졌습니다: Friday lunch?");
+  });
+
+  it("writes the recovery email in the requester's current language", async () => {
+    await polls.createPoll({ ...lunch, language: "ko" });
+    sent = [];
+    await polls.recoverOwnerLinks({ email: lunch.ownerEmail, language: "en", origin: ORIGIN });
+    expect(sent[0].subject).toBe("Your poll owner links");
+  });
+});
+
 describe("viewing a Poll by its Poll Link", () => {
   it("shows the question, Options and Open status, but not the Owner Email", async () => {
     const created = await polls.createPoll(lunch);
