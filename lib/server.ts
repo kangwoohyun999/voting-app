@@ -6,8 +6,14 @@ import { createPolls, type Db } from "@/lib/polls/polls";
 import { isLanguage, messages, type Language } from "@/lib/i18n/messages";
 import { createSmtpMailer } from "@/lib/mailer";
 
-const sql = neon(process.env.DATABASE_URL!);
-const db: Db = { query: (text, params) => sql.query(text, params) as never };
+// Connect on first query, not at import, so `next build` works without DATABASE_URL.
+let sql: ReturnType<typeof neon> | undefined;
+const db: Db = {
+  query: (text, params) => {
+    sql ??= neon(process.env.DATABASE_URL!);
+    return sql.query(text, params) as never;
+  },
+};
 
 export const polls = createPolls({ db, mailer: createSmtpMailer() });
 
@@ -44,8 +50,17 @@ export async function getMessages() {
   return messages[await getLanguage()];
 }
 
+/**
+ * Where links (including emailed Owner Links) point. In production this never comes
+ * from request headers: a forged Host would send someone's Owner Link to another site.
+ */
 export async function appOrigin() {
   if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, "");
+  if (process.env.NODE_ENV === "production") {
+    const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL; // set by Vercel
+    if (vercelUrl) return `https://${vercelUrl}`;
+    throw new Error("Set APP_URL to the app's public address, e.g. https://vote.example");
+  }
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
   const proto = h.get("x-forwarded-proto") ?? (host?.startsWith("localhost") ? "http" : "https");
