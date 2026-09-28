@@ -16,6 +16,8 @@ export const messages = {
     created: "투표가 만들어졌습니다",
     pollLinkLabel: "투표 링크 — 참여자에게 공유하세요",
     ownerLinkLabel: "관리 링크 — 비밀로 보관하세요",
+    ownerLinkEmailed: "관리 링크를 이메일로도 보냈습니다.",
+    ownerLinkEmailFailed: "이메일을 보내지 못했습니다. 관리 링크를 지금 꼭 저장해 두세요.",
     notFound: "투표를 찾을 수 없습니다.",
     vote: "투표하기",
     switchVote: "선택 바꾸기",

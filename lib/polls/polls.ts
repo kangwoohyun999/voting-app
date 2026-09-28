@@ -1,9 +1,14 @@
 import { randomBytes } from "node:crypto";
+import { emails } from "@/lib/i18n/emails";
 import type { Language } from "@/lib/i18n/messages";
 
 export type Db = {
   query<T = Record<string, unknown>>(text: string, params?: unknown[]): Promise<T[]>;
 };
+
+export type Email = { to: string; subject: string; text: string };
+
+export type Mailer = { send(email: Email): Promise<void> };
 
 export type Option = { id: number; label: string };
 
@@ -32,10 +37,12 @@ type CreatePollInput = {
   options: string[];
   ownerEmail: string;
   language: Language;
+  /** Scheme and host the emailed links point at, e.g. https://vote.example */
+  origin: string;
 };
 
 type CreatePollResult =
-  | { ok: true; pollId: string; ownerToken: string }
+  | { ok: true; pollId: string; ownerToken: string; emailSent: boolean }
   | { ok: false; error: "owner-email-required" };
 
 type VoteResult =
@@ -55,7 +62,21 @@ type TallyRow = { id: number; label: string; count: number };
 
 const randomId = (bytes: number) => randomBytes(bytes).toString("base64url");
 
-export function createPolls({ db }: { db: Db }) {
+export const pollLink = (origin: string, pollId: string) => `${origin}/p/${pollId}`;
+export const ownerLink = (origin: string, ownerToken: string) => `${origin}/o/${ownerToken}`;
+
+export function createPolls({ db, mailer }: { db: Db; mailer: Mailer }) {
+  // A failed email must not undo a Poll that is already stored.
+  async function trySend(email: Email) {
+    try {
+      await mailer.send(email);
+      return true;
+    } catch (error) {
+      console.error("Failed to send email", error);
+      return false;
+    }
+  }
+
   async function createPoll(input: CreatePollInput): Promise<CreatePollResult> {
     const ownerEmail = input.ownerEmail.trim().toLowerCase();
     if (!ownerEmail) return { ok: false, error: "owner-email-required" };
@@ -73,7 +94,15 @@ export function createPolls({ db }: { db: Db }) {
        SELECT p.id, t.label, t.ord FROM p, unnest($6::text[]) WITH ORDINALITY AS t(label, ord)`,
       [pollId, input.question, ownerToken, ownerEmail, input.language, input.options],
     );
-    return { ok: true, pollId, ownerToken };
+    const emailSent = await trySend({
+      to: ownerEmail,
+      ...emails[input.language].created({
+        question: input.question,
+        pollLink: pollLink(input.origin, pollId),
+        ownerLink: ownerLink(input.origin, ownerToken),
+      }),
+    });
+    return { ok: true, pollId, ownerToken, emailSent };
   }
 
   async function load(poll: LivePollRow, voterId: string | null, isOwner: boolean): Promise<LoadedPoll> {

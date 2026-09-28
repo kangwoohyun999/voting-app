@@ -1,26 +1,33 @@
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createPolls, type Db, type Polls } from "./polls";
+import { createPolls, type Db, type Email, type Mailer, type Polls } from "./polls";
 
 const SCHEMA = readFileSync(new URL("./schema.sql", import.meta.url), "utf8");
 
 let polls: Polls;
+let testDb: Db;
+let sent: Email[];
 
 beforeEach(async () => {
   const pg = new PGlite();
   await pg.exec(SCHEMA);
-  const db: Db = {
+  testDb = {
     query: async (text, params) => (await pg.query(text, params)).rows as never,
   };
-  polls = createPolls({ db });
+  sent = [];
+  const mailer: Mailer = { send: async (email) => void sent.push(email) };
+  polls = createPolls({ db: testDb, mailer });
 });
+
+const ORIGIN = "https://vote.example";
 
 const lunch = {
   question: "Friday lunch?",
   options: ["Pizza", "Tacos"],
   ownerEmail: "owner@example.com",
   language: "ko" as const,
+  origin: ORIGIN,
 };
 
 describe("creating a Poll", () => {
@@ -38,6 +45,31 @@ describe("creating a Poll", () => {
       ok: false,
       error: "owner-email-required",
     });
+    expect(sent).toEqual([]);
+  });
+
+  it("emails a copy of the Owner Link to the Owner Email", async () => {
+    const created = await polls.createPoll({ ...lunch, ownerEmail: " Owner@Example.com " });
+    if (!created.ok) throw new Error("expected ok");
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].to).toBe("owner@example.com");
+    expect(sent[0].text).toContain(`${ORIGIN}/o/${created.ownerToken}`);
+    expect(sent[0].text).toContain(`${ORIGIN}/p/${created.pollId}`);
+    expect(sent[0].text).toContain("Friday lunch?");
+    expect(created.emailSent).toBe(true);
+  });
+
+  it("still creates the Poll when the email cannot be sent", async () => {
+    const failing = createPolls({
+      db: testDb,
+      mailer: { send: async () => { throw new Error("SMTP down"); } },
+    });
+    const created = await failing.createPoll(lunch);
+    if (!created.ok) throw new Error("expected ok");
+
+    expect(created.emailSent).toBe(false);
+    expect((await polls.viewPoll(created.pollId, null)).kind).toBe("poll");
   });
 
   it("stores Options exactly as typed, including duplicates and blanks", async () => {

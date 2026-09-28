@@ -1,3 +1,4 @@
+import { pollLink } from "@/lib/polls/polls";
 import { appOrigin, getMessages, getVoterId, polls } from "@/lib/server";
 import { ownerAction } from "../../actions";
 import { DeleteButton } from "../../delete-button";
@@ -12,7 +13,7 @@ export default async function OwnerPage({ params }: PageProps<"/o/[token]">) {
   if (view.kind === "not-found") return <Gone message={t.ownerLinkNotFound} backHome={t.backHome} />;
   if (view.kind === "deleted") return <Gone message={t.deleted} backHome={t.backHome} />;
 
-  const pollLink = `${await appOrigin()}/p/${view.id}`;
+  const link = pollLink(await appOrigin(), view.id);
 
   return (
     <main className="page">
@@ -22,7 +23,7 @@ export default async function OwnerPage({ params }: PageProps<"/o/[token]">) {
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
         <dt className="text-zinc-500">{t.pollLinkLabel}</dt>
         <dd className="break-all font-mono">
-          <a href={pollLink} className="underline">{pollLink}</a>
+          <a href={link} className="underline">{link}</a>
         </dd>
         <dt className="text-zinc-500">{t.ownerEmailHint}</dt>
         <dd>{view.ownerEmailHint}</dd>

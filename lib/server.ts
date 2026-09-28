@@ -4,11 +4,12 @@ import { randomUUID } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { createPolls, type Db } from "@/lib/polls/polls";
 import { messages, type Language } from "@/lib/i18n/messages";
+import { createSmtpMailer } from "@/lib/mailer";
 
 const sql = neon(process.env.DATABASE_URL!);
 const db: Db = { query: (text, params) => sql.query(text, params) as never };
 
-export const polls = createPolls({ db });
+export const polls = createPolls({ db, mailer: createSmtpMailer() });
 
 // A Voter is one browser (ADR-0001): a random id in a long-lived cookie.
 const VOTER_COOKIE = "voter";

@@ -15,6 +15,9 @@ export function CreatePollForm({ t }: { t: Messages }) {
         <h2 className="text-xl font-semibold">{t.created}</h2>
         <LinkBox label={t.pollLinkLabel} href={state.pollLink} />
         <LinkBox label={t.ownerLinkLabel} href={state.ownerLink} />
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          {state.emailSent ? t.ownerLinkEmailed : t.ownerLinkEmailFailed}
+        </p>
       </section>
     );
   }
