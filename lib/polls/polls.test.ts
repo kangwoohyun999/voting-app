@@ -62,6 +62,77 @@ describe("creating a Poll", () => {
   });
 });
 
+async function createLunch(options = lunch.options) {
+  const created = await polls.createPoll({ ...lunch, options });
+  if (!created.ok) throw new Error("expected ok");
+  const view = await polls.viewPoll(created.pollId, null);
+  if (view.kind !== "poll") throw new Error("expected poll");
+  const optionId = (label: string) => view.options.find((o) => o.label === label)!.id;
+  return { ...created, optionId };
+}
+
+async function pollFor(pollId: string, voterId: string | null) {
+  const view = await polls.viewPoll(pollId, voterId);
+  if (view.kind !== "poll") throw new Error(`expected poll, got ${view.kind}`);
+  return view;
+}
+
+describe("voting", () => {
+  it("hides Results from a Voter who has not voted", async () => {
+    const { pollId } = await createLunch();
+    expect((await pollFor(pollId, "alice")).results).toBeNull();
+    expect((await pollFor(pollId, null)).results).toBeNull();
+  });
+
+  it("shows Results with count and share once the Voter has voted", async () => {
+    const { pollId, optionId } = await createLunch();
+    await polls.castVote(pollId, "alice", optionId("Pizza"));
+    await polls.castVote(pollId, "bob", optionId("Pizza"));
+    await polls.castVote(pollId, "carol", optionId("Tacos"));
+
+    const view = await pollFor(pollId, "alice");
+    expect(view.results).toEqual([
+      { optionId: optionId("Pizza"), label: "Pizza", count: 2, percent: 67 },
+      { optionId: optionId("Tacos"), label: "Tacos", count: 1, percent: 33 },
+    ]);
+    expect(view.myVote).toBe(optionId("Pizza"));
+  });
+
+  it("replaces the Voter's earlier Vote when they switch", async () => {
+    const { pollId, optionId } = await createLunch();
+    await polls.castVote(pollId, "alice", optionId("Pizza"));
+    expect(await polls.castVote(pollId, "alice", optionId("Tacos"))).toEqual({ ok: true });
+
+    const view = await pollFor(pollId, "alice");
+    expect(view.myVote).toBe(optionId("Tacos"));
+    expect(view.results?.map((r) => r.count)).toEqual([0, 1]);
+  });
+
+  it("shows 0% for Options nobody picked", async () => {
+    const { pollId, optionId } = await createLunch(["Pizza", "Tacos", "Sushi"]);
+    await polls.castVote(pollId, "alice", optionId("Sushi"));
+    expect((await pollFor(pollId, "alice")).results?.map((r) => r.percent)).toEqual([0, 0, 100]);
+  });
+
+  it("cannot be done on a Poll with no Options", async () => {
+    const { pollId } = await createLunch([]);
+    expect((await pollFor(pollId, "alice")).canVote).toBe(false);
+  });
+
+  it("rejects an Option from a different Poll", async () => {
+    const first = await createLunch();
+    const second = await createLunch();
+    expect(await polls.castVote(second.pollId, "alice", first.optionId("Pizza"))).toEqual({
+      ok: false,
+      error: "invalid-option",
+    });
+  });
+
+  it("is rejected for an unknown Poll", async () => {
+    expect(await polls.castVote("nope", "alice", 1)).toEqual({ ok: false, error: "not-found" });
+  });
+});
+
 describe("viewing a Poll by its Poll Link", () => {
   it("shows the question, Options and Open status, but not the Owner Email", async () => {
     const created = await polls.createPoll(lunch);

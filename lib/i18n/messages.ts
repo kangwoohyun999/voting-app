@@ -17,6 +17,13 @@ export const messages = {
     pollLinkLabel: "투표 링크 — 참여자에게 공유하세요",
     ownerLinkLabel: "관리 링크 — 비밀로 보관하세요",
     notFound: "투표를 찾을 수 없습니다.",
+    vote: "투표하기",
+    switchVote: "선택 바꾸기",
+    yourVote: "내 선택",
+    results: "결과",
+    votes: "표",
+    resultsAfterVoting: "투표하면 결과를 볼 수 있습니다.",
+    noOptions: "이 투표에는 선택지가 없어 투표할 수 없습니다.",
     backHome: "처음으로",
   },
 } as const;

@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { getMessages, polls } from "@/lib/server";
+import { getMessages, getVoterId, polls } from "@/lib/server";
+import { PollResults, VoteForm } from "../../poll-parts";
 
 export default async function PollPage({ params }: PageProps<"/p/[id]">) {
   const { id } = await params;
   const t = await getMessages();
-  const view = await polls.viewPoll(id, null);
+  const view = await polls.viewPoll(id, await getVoterId());
 
   if (view.kind === "not-found") {
     return (
@@ -18,13 +19,16 @@ export default async function PollPage({ params }: PageProps<"/p/[id]">) {
   return (
     <main className="page">
       <h1 className="text-2xl font-semibold">{view.question}</h1>
-      <ul className="flex flex-col gap-2">
-        {view.options.map((o) => (
-          <li key={o.id} className="rounded border border-zinc-300 p-3 dark:border-zinc-700">
-            {o.label}
-          </li>
-        ))}
-      </ul>
+      {view.canVote ? (
+        <VoteForm pollId={view.id} options={view.options} myVote={view.myVote} t={t} />
+      ) : (
+        <p>{t.noOptions}</p>
+      )}
+      {view.results ? (
+        <PollResults results={view.results} t={t} />
+      ) : (
+        view.canVote && <p className="text-zinc-500">{t.resultsAfterVoting}</p>
+      )}
     </main>
   );
 }

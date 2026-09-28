@@ -1,6 +1,15 @@
 "use server";
 
-import { appOrigin, getLanguage, polls } from "@/lib/server";
+import { refresh } from "next/cache";
+import { appOrigin, ensureVoterId, getLanguage, polls } from "@/lib/server";
+
+export async function castVoteAction(form: FormData) {
+  const pollId = String(form.get("pollId"));
+  const optionId = Number(form.get("optionId"));
+  if (!Number.isInteger(optionId)) return;
+  await polls.castVote(pollId, await ensureVoterId(), optionId);
+  refresh();
+}
 
 export type CreateState =
   | { status: "idle" }
