@@ -27,6 +27,11 @@ export const messages = {
     ownerPageTitle: "투표 관리",
     ownerEmailHint: "복구 이메일",
     ownerLinkNotFound: "관리 링크가 올바르지 않습니다.",
+    statusOpen: "진행 중",
+    statusClosed: "마감됨",
+    closedNotice: "마감된 투표입니다. 더 이상 투표하거나 선택을 바꿀 수 없습니다.",
+    closePoll: "투표 마감",
+    reopenPoll: "투표 다시 열기",
     backHome: "처음으로",
   },
 } as const;

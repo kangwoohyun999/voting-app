@@ -170,6 +170,49 @@ describe("the Owner Link", () => {
   });
 });
 
+describe("closing and reopening", () => {
+  it("a Closed Poll rejects new Votes and switches", async () => {
+    const { pollId, ownerToken, optionId } = await createLunch();
+    await polls.castVote(pollId, "alice", optionId("Pizza"));
+    expect(await polls.closePoll(ownerToken)).toEqual({ ok: true });
+
+    expect(await polls.castVote(pollId, "bob", optionId("Pizza"))).toEqual({ ok: false, error: "closed" });
+    expect(await polls.castVote(pollId, "alice", optionId("Tacos"))).toEqual({ ok: false, error: "closed" });
+
+    const view = await pollFor(pollId, "alice");
+    expect(view.status).toBe("closed");
+    expect(view.myVote).toBe(optionId("Pizza"));
+    expect(view.canVote).toBe(false);
+  });
+
+  it("a Closed Poll shows Results to a Voter who never voted", async () => {
+    const { pollId, ownerToken, optionId } = await createLunch();
+    await polls.castVote(pollId, "alice", optionId("Pizza"));
+    await polls.closePoll(ownerToken);
+
+    expect((await pollFor(pollId, "bob")).results?.map((r) => r.count)).toEqual([1, 0]);
+    expect((await pollFor(pollId, null)).results).not.toBeNull();
+  });
+
+  it("reopening restores the Open rules", async () => {
+    const { pollId, ownerToken, optionId } = await createLunch();
+    await polls.closePoll(ownerToken);
+    expect(await polls.reopenPoll(ownerToken)).toEqual({ ok: true });
+
+    const view = await pollFor(pollId, "bob");
+    expect(view.status).toBe("open");
+    expect(view.results).toBeNull();
+    expect(await polls.castVote(pollId, "bob", optionId("Tacos"))).toEqual({ ok: true });
+  });
+
+  it("is refused with a wrong Owner Link token", async () => {
+    const { pollId } = await createLunch();
+    expect(await polls.closePoll("wrong-token")).toEqual({ ok: false, error: "not-found" });
+    expect(await polls.reopenPoll("wrong-token")).toEqual({ ok: false, error: "not-found" });
+    expect((await pollFor(pollId, null)).status).toBe("open");
+  });
+});
+
 describe("viewing a Poll by its Poll Link", () => {
   it("shows the question, Options and Open status, but not the Owner Email", async () => {
     const created = await polls.createPoll(lunch);

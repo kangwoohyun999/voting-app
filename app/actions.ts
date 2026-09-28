@@ -11,6 +11,20 @@ export async function castVoteAction(form: FormData) {
   refresh();
 }
 
+// Authorised only by the Owner Link token; the Polls module rejects a wrong one.
+export async function ownerAction(form: FormData) {
+  const token = String(form.get("token"));
+  switch (form.get("intent")) {
+    case "close":
+      await polls.closePoll(token);
+      break;
+    case "reopen":
+      await polls.reopenPoll(token);
+      break;
+  }
+  refresh();
+}
+
 export type CreateState =
   | { status: "idle" }
   | { status: "error"; error: "owner-email-required" }

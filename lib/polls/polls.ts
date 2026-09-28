@@ -36,7 +36,9 @@ type CreatePollResult =
   | { ok: true; pollId: string; ownerToken: string }
   | { ok: false; error: "owner-email-required" };
 
-type VoteResult = { ok: true } | { ok: false; error: "not-found" | "invalid-option" };
+type VoteResult = { ok: true } | { ok: false; error: "not-found" | "closed" | "invalid-option" };
+
+type OwnerActionResult = { ok: true } | { ok: false; error: "not-found" };
 
 type PollRow = { id: string; question: string; status: "open" | "closed"; owner_email: string };
 type TallyRow = { id: number; label: string; count: number };
@@ -79,7 +81,7 @@ export function createPolls({ db }: { db: Db }) {
         )
       : [];
     const myVote = vote?.option_id ?? null;
-    const maySeeResults = isOwner || myVote !== null;
+    const maySeeResults = isOwner || poll.status === "closed" || myVote !== null;
 
     return {
       kind: "poll",
@@ -88,7 +90,7 @@ export function createPolls({ db }: { db: Db }) {
       status: poll.status,
       options: tally.map(({ id, label }) => ({ id, label })),
       myVote,
-      canVote: tally.length > 0,
+      canVote: poll.status === "open" && tally.length > 0,
       results: maySeeResults ? toResults(tally) : null,
     };
   }
@@ -116,20 +118,35 @@ export function createPolls({ db }: { db: Db }) {
 
   async function castVote(pollId: string, voterId: string, optionId: number): Promise<VoteResult> {
     // Casting and switching are the same upsert: one Vote per Voter per Poll.
+    // The Open check is in the same statement, so a Vote can't slip in after closing.
     const cast = await db.query(
       `INSERT INTO votes (poll_id, voter_id, option_id)
-       SELECT o.poll_id, $2, o.id FROM options o WHERE o.id = $3 AND o.poll_id = $1
+       SELECT o.poll_id, $2, o.id
+       FROM options o JOIN polls p ON p.id = o.poll_id
+       WHERE o.id = $3 AND o.poll_id = $1 AND p.status = 'open'
        ON CONFLICT (poll_id, voter_id) DO UPDATE SET option_id = excluded.option_id
        RETURNING option_id`,
       [pollId, voterId, optionId],
     );
     if (cast.length > 0) return { ok: true };
 
-    const [poll] = await db.query(`SELECT 1 FROM polls WHERE id = $1`, [pollId]);
-    return { ok: false, error: poll ? "invalid-option" : "not-found" };
+    const poll = await findPoll("id", pollId);
+    if (!poll) return { ok: false, error: "not-found" };
+    return { ok: false, error: poll.status === "open" ? "invalid-option" : "closed" };
   }
 
-  return { createPoll, viewPoll, viewAsOwner, castVote };
+  async function setStatus(ownerToken: string, status: "open" | "closed"): Promise<OwnerActionResult> {
+    const updated = await db.query(
+      `UPDATE polls SET status = $2 WHERE owner_token = $1 RETURNING id`,
+      [ownerToken, status],
+    );
+    return updated.length > 0 ? { ok: true } : { ok: false, error: "not-found" };
+  }
+
+  const closePoll = (ownerToken: string) => setStatus(ownerToken, "closed");
+  const reopenPoll = (ownerToken: string) => setStatus(ownerToken, "open");
+
+  return { createPoll, viewPoll, viewAsOwner, castVote, closePoll, reopenPoll };
 }
 
 function maskEmail(email: string) {
