@@ -19,12 +19,13 @@ beforeEach(async () => {
   sent = [];
   const mailer: Mailer = { send: async (email) => void sent.push(email) };
   clock = new Date("2026-09-30T09:00:00+09:00");
-  polls = createPolls({ db: testDb, mailer, now: () => clock });
+  polls = createPolls({ db: testDb, mailer, now: () => clock, operatorPassword: OPERATOR_PASSWORD });
 });
 
 const later = (minutes: number) => new Date(clock.getTime() + minutes * 60_000);
 
 const ORIGIN = "https://vote.example";
+const OPERATOR_PASSWORD = "operator-secret";
 
 const lunch = {
   question: "Friday lunch?",
@@ -32,6 +33,7 @@ const lunch = {
   ownerEmail: "owner@example.com",
   language: "ko" as const,
   origin: ORIGIN,
+  operatorPassword: OPERATOR_PASSWORD,
 };
 
 describe("creating a Poll", () => {
@@ -42,6 +44,25 @@ describe("creating a Poll", () => {
     expect(created.pollId).toMatch(/^[\w-]{10,}$/);
     expect(created.ownerToken).toMatch(/^[\w-]{40,}$/);
     expect(created.ownerToken).not.toContain(created.pollId);
+  });
+
+  it("is refused without the Operator Password", async () => {
+    for (const operatorPassword of ["wrong", ""]) {
+      expect(await polls.createPoll({ ...lunch, operatorPassword })).toEqual({
+        ok: false,
+        error: "operator-password-invalid",
+      });
+    }
+    expect(sent).toEqual([]);
+  });
+
+  it("is refused for everyone when no Operator Password is configured", async () => {
+    const unconfigured = createPolls({ db: testDb, mailer: { send: async () => {} } });
+    expect(await unconfigured.createPoll(lunch)).toEqual({ ok: false, error: "operator-password-invalid" });
+    expect(await unconfigured.createPoll({ ...lunch, operatorPassword: "" })).toEqual({
+      ok: false,
+      error: "operator-password-invalid",
+    });
   });
 
   it("is refused without an Owner Email", async () => {
@@ -67,6 +88,7 @@ describe("creating a Poll", () => {
   it("still creates the Poll when the email cannot be sent", async () => {
     const failing = createPolls({
       db: testDb,
+      operatorPassword: OPERATOR_PASSWORD,
       mailer: { send: async () => { throw new Error("SMTP down"); } },
     });
     const created = await failing.createPoll(lunch);

@@ -15,7 +15,11 @@ const db: Db = {
   },
 };
 
-export const polls = createPolls({ db, mailer: createSmtpMailer() });
+export const polls = createPolls({
+  db,
+  mailer: createSmtpMailer(),
+  operatorPassword: process.env.OPERATOR_PASSWORD,
+});
 
 // A Voter is one browser (ADR-0001): a random id in a long-lived cookie.
 const VOTER_COOKIE = "voter";

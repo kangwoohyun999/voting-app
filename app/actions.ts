@@ -2,7 +2,7 @@
 
 import { refresh } from "next/cache";
 import { cookies } from "next/headers";
-import { ownerLink, pollLink } from "@/lib/polls/polls";
+import { ownerLink, pollLink, type Polls } from "@/lib/polls/polls";
 import { appOrigin, ensureVoterId, getLanguage, LANGUAGE_COOKIE, polls } from "@/lib/server";
 
 export async function castVoteAction(form: FormData) {
@@ -44,9 +44,11 @@ export async function recoverAction(_prev: boolean, form: FormData): Promise<boo
   return true; // Same answer whether or not the email has Polls.
 }
 
+type CreatePollError = Extract<Awaited<ReturnType<Polls["createPoll"]>>, { ok: false }>["error"];
+
 export type CreateState =
   | { status: "idle" }
-  | { status: "error"; error: "owner-email-required" | "closing-time-in-past" }
+  | { status: "error"; error: CreatePollError }
   | { status: "created"; pollLink: string; ownerLink: string; emailSent: boolean };
 
 /** A `datetime-local` value ("2026-09-30T18:00") read as Korean time. */
@@ -64,6 +66,7 @@ export async function createPollAction(_prev: CreateState, form: FormData): Prom
     language: await getLanguage(),
     origin,
     closesAt: parseKoreanTime(form.get("closesAt")),
+    operatorPassword: String(form.get("operatorPassword") ?? ""),
   });
   if (!result.ok) return { status: "error", error: result.error };
 

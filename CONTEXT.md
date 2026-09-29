@@ -32,8 +32,12 @@ _Avoid_: Archived, removed, hidden
 An anonymous participant, recognised only as one browser. No sign-in or personal identity.
 _Avoid_: User, account, participant
 
+**Operator**:
+Anyone who knows the Operator Password, the single shared secret that allows creating Polls. Only an Operator can create a Poll; everyone else can only vote.
+_Avoid_: Admin, staff, moderator
+
 **Poll Owner**:
-The Voter who created a Poll. Proves ownership by holding the Poll's Owner Link. Can vote on their own Poll like any Voter, and can always see its Results whether or not they have voted.
+The Operator who created a Poll. Proves ownership by holding the Poll's Owner Link. Can vote on their own Poll like any Voter, and can always see its Results whether or not they have voted.
 _Avoid_: Admin, creator, author, host
 
 **Owner Email**:

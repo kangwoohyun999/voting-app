@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { emails } from "@/lib/i18n/emails";
 import type { Language } from "@/lib/i18n/messages";
 
@@ -42,11 +42,13 @@ type CreatePollInput = {
   /** Scheme and host the emailed links point at, e.g. https://vote.example */
   origin: string;
   closesAt?: Date | null;
+  /** Must match the configured Operator Password. */
+  operatorPassword?: string;
 };
 
 type CreatePollResult =
   | { ok: true; pollId: string; ownerToken: string; emailSent: boolean }
-  | { ok: false; error: "owner-email-required" | "closing-time-in-past" };
+  | { ok: false; error: "operator-password-invalid" | "owner-email-required" | "closing-time-in-past" };
 
 type VoteResult =
   | { ok: true }
@@ -82,11 +84,14 @@ export function createPolls({
   db,
   mailer,
   now = () => new Date(),
+  operatorPassword,
 }: {
   db: Db;
   mailer: Mailer;
   /** Injectable clock, so tests can let a Closing Time pass. */
   now?: () => Date;
+  /** The shared secret that allows creating Polls. Unset means nobody can create one. */
+  operatorPassword?: string;
 }) {
   // A failed email must not undo a Poll that is already stored.
   async function trySend(email: Email) {
@@ -100,6 +105,9 @@ export function createPolls({
   }
 
   async function createPoll(input: CreatePollInput): Promise<CreatePollResult> {
+    if (!matchesOperatorPassword(operatorPassword, input.operatorPassword)) {
+      return { ok: false, error: "operator-password-invalid" };
+    }
     const ownerEmail = input.ownerEmail.trim().toLowerCase();
     if (!ownerEmail) return { ok: false, error: "owner-email-required" };
     const closesAt = input.closesAt ?? null;
@@ -278,6 +286,13 @@ export function createPolls({
     deletePoll,
     recoverOwnerLinks,
   };
+}
+
+// Compares hashes so the check takes the same time whatever the guess.
+function matchesOperatorPassword(expected: string | undefined, given: string | undefined) {
+  if (!expected || !given) return false;
+  const digest = (value: string) => createHash("sha256").update(value).digest();
+  return timingSafeEqual(digest(expected), digest(given));
 }
 
 function maskEmail(email: string) {

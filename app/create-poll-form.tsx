@@ -65,9 +65,20 @@ export function CreatePollForm({ t }: { t: Messages }) {
         <span className="font-medium">{t.ownerEmail}</span>
         <input name="ownerEmail" type="email" required className="input" />
       </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="font-medium">{t.operatorPassword}</span>
+        <input name="operatorPassword" type="password" required autoComplete="current-password" className="input" />
+      </label>
       {state.status === "error" && (
         <p className="text-red-600">
-          {state.error === "closing-time-in-past" ? t.closingTimeInPast : t.ownerEmailRequired}
+          {
+            {
+              "operator-password-invalid": t.operatorPasswordInvalid,
+              "owner-email-required": t.ownerEmailRequired,
+              "closing-time-in-past": t.closingTimeInPast,
+            }[state.error]
+          }
         </p>
       )}
 
