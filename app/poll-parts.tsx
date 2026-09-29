@@ -9,6 +9,11 @@ export function PollBody({ view, t }: { view: LoadedPoll; t: Messages }) {
   return (
     <>
       <StatusBadge status={view.status} t={t} />
+      {view.closesAt && (
+        <p className="text-sm text-zinc-500">
+          {t.closesAt}: {formatKoreanTime(view.closesAt, t.dateLocale)} (KST)
+        </p>
+      )}
       {view.status === "closed" ? (
         <p className="text-zinc-500">{t.closedNotice}</p>
       ) : view.canVote ? (
@@ -24,6 +29,11 @@ export function PollBody({ view, t }: { view: LoadedPoll; t: Messages }) {
     </>
   );
 }
+
+const formatKoreanTime = (iso: string, locale: string) =>
+  new Intl.DateTimeFormat(locale, { timeZone: "Asia/Seoul", dateStyle: "medium", timeStyle: "short" }).format(
+    new Date(iso),
+  );
 
 function StatusBadge({ status, t }: { status: "open" | "closed"; t: Messages }) {
   return (

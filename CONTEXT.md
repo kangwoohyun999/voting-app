@@ -15,8 +15,12 @@ One of the possible answers on a Poll. A Poll may have any number of Options, in
 _Avoid_: Choice, answer, candidate, item
 
 **Open / Closed**:
-A Poll is Open from creation and accepts Votes. The Poll Owner can close it, making it Closed: no Votes can be cast or changed, and its Results are visible to everyone. The Poll Owner can reopen a Closed Poll, which restores the usual Open rules, including hiding Results from Voters who have not voted.
+A Poll is Open from creation and accepts Votes. It becomes Closed when the Poll Owner closes it or its Closing Time passes: no Votes can be cast or changed, and its Results are visible to everyone. The Poll Owner can reopen a Closed Poll, which restores the usual Open rules, including hiding Results from Voters who have not voted.
 _Avoid_: Active/inactive, ended, finished, archived
+
+**Closing Time**:
+An optional moment, set only when the Poll is created and never changed, at which the Poll becomes Closed. Shown in Korean time. Reopening a Poll whose Closing Time has passed removes its Closing Time.
+_Avoid_: Deadline, end date, expiry
 
 **Deleted Poll**:
 A Poll its Poll Owner has removed. It no longer accepts Votes or shows Results; its Poll Link says it was deleted by its owner.

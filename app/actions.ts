@@ -46,8 +46,14 @@ export async function recoverAction(_prev: boolean, form: FormData): Promise<boo
 
 export type CreateState =
   | { status: "idle" }
-  | { status: "error"; error: "owner-email-required" }
+  | { status: "error"; error: "owner-email-required" | "closing-time-in-past" }
   | { status: "created"; pollLink: string; ownerLink: string; emailSent: boolean };
+
+/** A `datetime-local` value ("2026-09-30T18:00") read as Korean time. */
+function parseKoreanTime(value: FormDataEntryValue | null): Date | null {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
+  return new Date(`${value}:00+09:00`);
+}
 
 export async function createPollAction(_prev: CreateState, form: FormData): Promise<CreateState> {
   const origin = await appOrigin();
@@ -57,6 +63,7 @@ export async function createPollAction(_prev: CreateState, form: FormData): Prom
     ownerEmail: String(form.get("ownerEmail") ?? ""),
     language: await getLanguage(),
     origin,
+    closesAt: parseKoreanTime(form.get("closesAt")),
   });
   if (!result.ok) return { status: "error", error: result.error };
 

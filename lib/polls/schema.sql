@@ -10,6 +10,9 @@ CREATE TABLE IF NOT EXISTS polls (
   created_at   timestamptz NOT NULL DEFAULT now()
 );
 
+-- Optional Closing Time; added after the first release.
+ALTER TABLE polls ADD COLUMN IF NOT EXISTS closes_at timestamptz;
+
 CREATE INDEX IF NOT EXISTS polls_owner_email_idx ON polls (owner_email);
 
 CREATE TABLE IF NOT EXISTS options (

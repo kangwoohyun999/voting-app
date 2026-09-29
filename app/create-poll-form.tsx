@@ -56,10 +56,20 @@ export function CreatePollForm({ t }: { t: Messages }) {
       </fieldset>
 
       <label className="flex flex-col gap-1">
+        <span className="font-medium">{t.closingTime}</span>
+        <input name="closesAt" type="datetime-local" className="input" />
+        <span className="text-sm text-zinc-500">{t.closingTimeHint}</span>
+      </label>
+
+      <label className="flex flex-col gap-1">
         <span className="font-medium">{t.ownerEmail}</span>
         <input name="ownerEmail" type="email" required className="input" />
       </label>
-      {state.status === "error" && <p className="text-red-600">{t.ownerEmailRequired}</p>}
+      {state.status === "error" && (
+        <p className="text-red-600">
+          {state.error === "closing-time-in-past" ? t.closingTimeInPast : t.ownerEmailRequired}
+        </p>
+      )}
 
       <button type="submit" disabled={pending} className="btn-primary">
         {pending ? t.creating : t.create}

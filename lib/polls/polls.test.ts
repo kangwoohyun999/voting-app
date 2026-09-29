@@ -8,6 +8,7 @@ const SCHEMA = readFileSync(new URL("./schema.sql", import.meta.url), "utf8");
 let polls: Polls;
 let testDb: Db;
 let sent: Email[];
+let clock: Date;
 
 beforeEach(async () => {
   const pg = new PGlite();
@@ -17,8 +18,11 @@ beforeEach(async () => {
   };
   sent = [];
   const mailer: Mailer = { send: async (email) => void sent.push(email) };
-  polls = createPolls({ db: testDb, mailer });
+  clock = new Date("2026-09-30T09:00:00+09:00");
+  polls = createPolls({ db: testDb, mailer, now: () => clock });
 });
+
+const later = (minutes: number) => new Date(clock.getTime() + minutes * 60_000);
 
 const ORIGIN = "https://vote.example";
 
@@ -339,6 +343,70 @@ describe("email language", () => {
     sent = [];
     await polls.recoverOwnerLinks({ email: lunch.ownerEmail, language: "en", origin: ORIGIN });
     expect(sent[0].subject).toBe("Your poll owner links");
+  });
+});
+
+describe("Closing Time", () => {
+  it("is optional", async () => {
+    const { pollId } = await createLunch();
+    expect((await pollFor(pollId, null)).closesAt).toBeNull();
+  });
+
+  it("must be in the future", async () => {
+    expect(await polls.createPoll({ ...lunch, closesAt: later(-1) })).toEqual({
+      ok: false,
+      error: "closing-time-in-past",
+    });
+    expect(sent).toEqual([]);
+  });
+
+  it("keeps the Poll Open until it passes", async () => {
+    const created = await polls.createPoll({ ...lunch, closesAt: later(60) });
+    if (!created.ok) throw new Error("expected ok");
+    const view = await pollFor(created.pollId, null);
+
+    expect(view.status).toBe("open");
+    expect(view.closesAt).toBe("2026-09-30T01:00:00.000Z");
+    expect(await polls.castVote(created.pollId, "alice", view.options[0].id)).toEqual({ ok: true });
+  });
+
+  it("closes the Poll once it passes: no Votes, Results for everyone", async () => {
+    const created = await polls.createPoll({ ...lunch, closesAt: later(60) });
+    if (!created.ok) throw new Error("expected ok");
+    const [pizza] = (await pollFor(created.pollId, null)).options;
+    await polls.castVote(created.pollId, "alice", pizza.id);
+
+    clock = later(60);
+
+    const view = await pollFor(created.pollId, "bob");
+    expect(view.status).toBe("closed");
+    expect(view.canVote).toBe(false);
+    expect(view.results?.map((r) => r.count)).toEqual([1, 0]);
+    expect(await polls.castVote(created.pollId, "bob", pizza.id)).toEqual({ ok: false, error: "closed" });
+    expect((await ownerView(created.ownerToken)).status).toBe("closed");
+  });
+
+  it("is removed when the Poll is reopened after it passed", async () => {
+    const created = await polls.createPoll({ ...lunch, closesAt: later(60) });
+    if (!created.ok) throw new Error("expected ok");
+    clock = later(120);
+
+    expect(await polls.reopenPoll(created.ownerToken)).toEqual({ ok: true });
+
+    const view = await pollFor(created.pollId, null);
+    expect(view.status).toBe("open");
+    expect(view.closesAt).toBeNull();
+  });
+
+  it("is kept when a Poll closed early is reopened before it passes", async () => {
+    const created = await polls.createPoll({ ...lunch, closesAt: later(60) });
+    if (!created.ok) throw new Error("expected ok");
+    await polls.closePoll(created.ownerToken);
+    await polls.reopenPoll(created.ownerToken);
+
+    const view = await pollFor(created.pollId, null);
+    expect(view.status).toBe("open");
+    expect(view.closesAt).toBe("2026-09-30T01:00:00.000Z");
   });
 });
 
