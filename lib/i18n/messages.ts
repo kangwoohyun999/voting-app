@@ -49,6 +49,7 @@ const ko = {
   recoverSent: "이 이메일로 만든 투표가 있다면 관리 링크를 보냈습니다. 메일함을 확인해 주세요.",
   backHome: "처음으로",
   switchLanguage: "English",
+  madeBy: "만든 사람",
 };
 
 export type Messages = Record<keyof typeof ko, string>;
@@ -103,6 +104,7 @@ const en: Messages = {
   recoverSent: "If any polls were created with this email, we've sent their owner links. Check your inbox.",
   backHome: "Back to start",
   switchLanguage: "한국어",
+  madeBy: "Made by",
 };
 
 export const messages = { ko, en } satisfies Record<string, Messages>;

@@ -14,6 +14,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Assignment author, shown on every page.
+const AUTHOR = "강우현";
+
 export const metadata: Metadata = {
   title: "투표 / Voting",
   description: "Anonymous link-based polls",
@@ -31,6 +34,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           <button type="submit" className="text-sm text-zinc-500 underline">{t.switchLanguage}</button>
         </form>
         {children}
+        <footer className="mt-auto px-4 py-6 text-center text-sm text-zinc-500">
+          {t.madeBy}: {AUTHOR}
+        </footer>
       </body>
     </html>
   );
