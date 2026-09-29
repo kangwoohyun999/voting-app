@@ -3,6 +3,7 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --chart-bar: #2a78d6; /* validated >= 3:1 on --background */
 }
 
 @theme inline {
@@ -16,6 +17,7 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --chart-bar: #3987e5;
   }
 }
 

@@ -64,26 +64,52 @@ function VoteForm({
   );
 }
 
+/**
+ * Horizontal bar chart of Results: one series, so one color and no legend.
+ * Bar length is the Option's share of all Votes; every value is also shown as text.
+ */
 function PollResults({ results, myVote, t }: { results: Result[]; myVote: number | null; t: Messages }) {
+  const total = results.reduce((sum, r) => sum + r.count, 0);
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold">{t.results}</h2>
-      {results.map((r) => (
-        <div key={r.optionId} className="flex flex-col gap-1">
-          <div className="flex justify-between text-sm">
-            <span>
-              {r.label}
-              {r.optionId === myVote && <span className="ml-2 text-zinc-500">({t.yourVote})</span>}
-            </span>
-            <span className="tabular-nums">
-              {r.count} {t.votes} · {r.percent}%
-            </span>
-          </div>
-          <div className="h-2 rounded bg-zinc-200 dark:bg-zinc-800">
-            <div className="h-2 rounded bg-foreground" style={{ width: `${r.percent}%` }} />
-          </div>
-        </div>
-      ))}
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-lg font-semibold">{t.results}</h2>
+        <span className="text-sm text-zinc-500 tabular-nums">
+          {t.totalVotes} {total} {t.votes}
+        </span>
+      </div>
+      <ul className="flex flex-col gap-3">
+        {results.map((r) => {
+          const label = r.label || "—";
+          const mine = r.optionId === myVote;
+          const summary = `${label}: ${r.count} ${t.votes} (${r.percent}%)${mine ? ` · ${t.yourVote}` : ""}`;
+          return (
+            <li key={r.optionId} className="group relative flex flex-col gap-1" tabIndex={0} aria-label={summary}>
+              <span className="break-words text-sm">
+                {label}
+                {mine && <span className="ml-2 text-zinc-500">({t.yourVote})</span>}
+              </span>
+              <div className="grid grid-cols-[1fr_auto] items-center gap-3">
+                <div className="h-5 border-l border-zinc-300 dark:border-zinc-700">
+                  <div
+                    className="h-5 rounded-r bg-(--chart-bar)"
+                    style={{ width: `${r.percent}%` }}
+                  />
+                </div>
+                <span className="text-sm text-zinc-600 tabular-nums dark:text-zinc-400">
+                  {r.count} {t.votes} · {r.percent}%
+                </span>
+              </div>
+              <span
+                role="tooltip"
+                className="pointer-events-none absolute -top-8 left-0 z-10 hidden whitespace-nowrap rounded bg-foreground px-2 py-1 text-xs text-background group-hover:block group-focus:block"
+              >
+                {summary}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }
